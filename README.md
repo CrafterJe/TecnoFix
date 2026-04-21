@@ -1,22 +1,36 @@
-# TecnoFix Backend
+# TecnoFix — Backend
 
-API REST para sistema de gestión de taller de reparación de dispositivos electrónicos.
-Administra órdenes de servicio, inventario, clientes y técnicos con control de acceso por roles.
+API REST para un sistema de gestión de taller de reparación de dispositivos electrónicos.
+Administra órdenes de servicio, inventario, clientes y técnicos con control de acceso por roles, auditoría automática y registro de evidencias fotográficas.
+
+Disponible como aplicación de escritorio Windows (.msi) y como aplicación web. Este repositorio es el backend.
+
+---
 
 ## Stack
 
-- Python 3.11 + Django 5.0
-- Django REST Framework 3.15
-- MySQL (mysqlclient)
-- JWT via djangorestframework-simplejwt
-- Swagger via drf-spectacular
-- pytest + factory-boy (tests)
+| Tecnología | Versión | Uso |
+|---|---|---|
+| Python | 3.11 | Lenguaje |
+| Django | 5.0.6 | Framework web |
+| Django REST Framework | 3.15.2 | API REST |
+| djangorestframework-simplejwt | 5.3.1 | Autenticación JWT |
+| MySQL | 8.0+ | Base de datos |
+| mysqlclient | 2.2.4 | Driver MySQL |
+| django-cors-headers | 4.4.0 | CORS para el frontend |
+| Pillow | 10.4.0 | Imágenes de evidencias |
+| drf-spectacular | 0.27.2 | Documentación Swagger |
+| pytest + factory-boy | — | Tests |
+
+---
 
 ## Requisitos previos
 
 - Python 3.11+
 - MySQL 8.0+
 - Git
+
+---
 
 ## Instalación
 
@@ -54,27 +68,35 @@ mysql -u root -p -e "CREATE DATABASE tecnofix CHARACTER SET utf8mb4 COLLATE utf8
 python manage.py makemigrations
 python manage.py migrate
 
-# 8. Crear usuarios de prueba (menu interactivo)
+# 8. Crear usuarios de prueba (menú interactivo)
 python manage.py create_test_users
 
-# 9. Sembrar datos de prueba (menu interactivo)
+# 9. Sembrar datos de prueba (menú interactivo)
 python manage.py seed_data
 
 # 10. Correr el servidor
 python manage.py runserver
 ```
 
+---
+
 ## Variables de entorno (.env)
 
-| Variable | Descripcion | Ejemplo |
+| Variable | Descripción | Ejemplo |
 |---|---|---|
 | `SECRET_KEY` | Clave secreta de Django | `bn%_i197a4gu=...` |
 | `DEBUG` | Modo debug | `True` |
 | `DB_NAME` | Nombre de la BD | `tecnofix` |
 | `DB_USER` | Usuario MySQL | `root` |
-| `DB_PASSWORD` | Contrasena MySQL | `mipassword` |
+| `DB_PASSWORD` | Contraseña MySQL | `mipassword` |
 | `DB_HOST` | Host MySQL | `localhost` |
 | `DB_PORT` | Puerto MySQL | `3306` |
+| `ALLOWED_HOSTS` | Hosts permitidos | `localhost,127.0.0.1` |
+| `CORS_ALLOWED_ORIGINS` | Orígenes del frontend | `http://localhost:5173` |
+
+Ver `.env.example` para la plantilla completa.
+
+---
 
 ## Estructura del proyecto
 
@@ -82,110 +104,184 @@ python manage.py runserver
 TecnoFix-BackEnd/
 ├── config/
 │   ├── settings/
-│   │   ├── base.py          # Configuracion base
-│   │   ├── development.py   # Desarrollo (CORS abierto, SQL logs)
-│   │   └── production.py    # Produccion (HTTPS, CORS restringido)
-│   ├── urls.py              # Rutas principales
+│   │   ├── base.py          # Configuración base
+│   │   ├── development.py   # Desarrollo (CORS abierto, debug toolbar)
+│   │   └── production.py    # Producción (HTTPS, CORS restringido)
+│   ├── urls.py              # Rutas principales bajo /api/v1/
 │   └── wsgi.py
 ├── core/                    # App compartida (no es de negocio)
-│   ├── mixins.py            # AuditableMixin
-│   ├── middleware.py        # AuditMiddleware
-│   ├── signals.py           # Auditoria automatica
+│   ├── models.py            # BaseModel abstracto (created_at, updated_at)
+│   ├── mixins.py            # AuditableMixin (marcador de auditoría)
+│   ├── middleware.py        # AuditMiddleware (guarda user+IP en thread-local)
+│   ├── signals.py           # Handlers pre/post save/delete para AuditLog
 │   ├── permissions.py       # IsAdmin, IsTecnico, IsRecepcion...
-│   ├── pagination.py        # StandardResultsPagination
-│   └── utils.py             # Generador de numero de orden
+│   ├── pagination.py        # StandardResultsPagination (page_size=20, máx 100)
+│   └── utils.py             # Generador de número de orden ORD-YYYYMMDD-NNN
 ├── apps/
-│   ├── users/               # Usuarios y autenticacion
+│   ├── users/               # Usuario custom (login por email), roles JWT
 │   ├── clientes/            # Clientes y dispositivos
-│   ├── ordenes/             # Ordenes, evidencias, refacciones usadas
+│   ├── ordenes/             # Órdenes, evidencias, refacciones usadas
 │   ├── inventario/          # Refacciones y compatibilidades
-│   └── auditoria/           # Registro de auditoria (solo lectura)
+│   └── auditoria/           # Registro de auditoría (solo lectura vía API)
+├── docs/
+│   ├── admin/               # Convenciones y guías internas
+│   ├── PR/                  # Descripciones de pull requests
+│   ├── users/               # Docs y testing del módulo usuarios
+│   ├── clientes/            # Docs y testing del módulo clientes
+│   ├── ordenes/             # Docs y testing del módulo órdenes
+│   ├── inventario/          # Docs y testing del módulo inventario
+│   ├── auditoria/           # Docs y testing del módulo auditoría
+│   └── core/                # Docs de utilidades compartidas
 ├── requirements/
 │   ├── base.txt
 │   ├── development.txt
 │   └── production.txt
-├── logs/                    # Logs rotativos (generados automaticamente)
+├── logs/                    # app.log rotativo (generado automáticamente)
+├── media/                   # Imágenes de evidencias (generado automáticamente)
+│   └── evidencias/
+│       └── orden_ORD-XXXX/  # Imágenes agrupadas por orden
+├── conftest.py              # Fixtures globales de tests
 ├── manage.py
 └── .env.example
 ```
 
-## Endpoints principales
+---
+
+## API
 
 Base URL: `http://localhost:8000/api/v1/`
 
-| Recurso | URL |
+| Módulo | Endpoints |
 |---|---|
-| Login | `POST /users/auth/login/` |
-| Refresh token | `POST /users/auth/refresh/` |
-| Usuarios | `/users/` |
+| Auth | `POST /users/auth/login/` · `POST /users/auth/refresh/` |
+| Usuarios | `/users/` + cambiar-password, activar, desactivar |
 | Clientes | `/clientes/` |
 | Dispositivos | `/clientes/dispositivos/` |
-| Ordenes | `/ordenes/` |
+| Órdenes | `/ordenes/` + cambiar-estado, asignar-tecnico, agregar-refaccion |
 | Evidencias | `/ordenes/evidencias/` |
-| Inventario | `/inventario/` |
-| Auditoria | `/auditoria/` |
+| Inventario | `/inventario/` + ajustar-stock |
+| Compatibilidades | `/inventario/compatibles/` |
+| Auditoría | `/auditoria/` |
 
-Documentacion interactiva (Swagger): `http://localhost:8000/api/v1/docs/`
+Documentación interactiva (Swagger): `http://localhost:8000/api/v1/docs/`
+
+### Autenticación
+
+JWT Bearer en el header de cada petición:
+
+```
+Authorization: Bearer <access_token>
+```
+
+- Access token: 8 horas
+- Refresh token: 1 día, se rota en cada uso
+
+### Paginación
+
+Todas las respuestas de listado siguen este formato:
+
+```json
+{
+  "count": 45,
+  "total_pages": 3,
+  "current_page": 1,
+  "next": "http://localhost:8000/api/v1/ordenes/?page=2",
+  "previous": null,
+  "results": []
+}
+```
+
+Parámetros: `?page=N` · `?page_size=N` (máximo 100, default 20)
+
+---
 
 ## Roles y permisos
 
 | Rol | Acceso |
 |---|---|
-| `admin` | Acceso total |
-| `tecnico` | Lectura general, puede cambiar estado de ordenes y ajustar stock |
-| `recepcion` | Crear clientes, dispositivos y ordenes |
+| `admin` | Acceso total: usuarios, eliminar, auditoría, asignar técnicos |
+| `tecnico` | Ver órdenes asignadas, cambiar estado, ajustar stock |
+| `recepcion` | Crear clientes, dispositivos y órdenes |
 
-## Comandos utiles
+---
+
+## Comandos útiles
 
 ```bash
-# Usuarios de prueba (menu interactivo)
+# Servidor de desarrollo
+python manage.py runserver
+
+# Usuarios de prueba (menú interactivo)
 python manage.py create_test_users
 
-# Datos de prueba (menu interactivo)
+# Datos de prueba (menú interactivo)
 python manage.py seed_data
 
-# Correr tests
+# Correr todos los tests
 pytest
-
-# Tests con cobertura
-pytest --cov
 
 # Tests de una sola app
 pytest apps/ordenes/
+
+# Tests por nombre
+pytest -k test_login
+
+# Tests con cobertura
+pytest --cov
 ```
+
+---
 
 ## Credenciales de prueba
 
-| Email | Contrasena | Rol |
+> Disponibles después de ejecutar `python manage.py create_test_users`
+
+| Email | Contraseña | Rol |
 |---|---|---|
 | admin@tecnofix.com | Admin2024! | Administrador |
-| tecnico1@tecnofix.com | Tecnico2024! | Tecnico |
-| tecnico2@tecnofix.com | Tecnico2024! | Tecnico |
-| recepcion1@tecnofix.com | Recepcion2024! | Recepcion |
-| recepcion2@tecnofix.com | Recepcion2024! | Recepcion |
+| tecnico1@tecnofix.com | Tecnico2024! | Técnico |
+| tecnico2@tecnofix.com | Tecnico2024! | Técnico |
+| recepcion1@tecnofix.com | Recepcion2024! | Recepción |
+| recepcion2@tecnofix.com | Recepcion2024! | Recepción |
 
-## Auditoria automatica
+---
 
-Todos los modelos que heredan `AuditableMixin` quedan auditados automaticamente.
-Cada CREATE, UPDATE y DELETE genera un registro en `AuditLog` con:
-- Usuario que realizo la accion
+## Auditoría automática
+
+Todos los modelos que heredan `AuditableMixin` quedan auditados automáticamente.
+Cada `CREATE`, `UPDATE` y `DELETE` genera un registro en `AuditLog` con:
+
+- Usuario que realizó la acción (vía thread-local del `AuditMiddleware`)
 - IP de origen
 - Valores anteriores y nuevos en JSON
 
-Los registros son accesibles en `GET /api/v1/auditoria/` (solo administradores).
+Los registros son accesibles en `GET /api/v1/auditoria/` (solo administradores). Los logs nunca se crean manualmente — es todo automático vía Django signals.
 
-## Produccion
+---
+
+## Número de orden
+
+- Formato: `ORD-YYYYMMDD-NNN` (ej. `ORD-20240324-001`)
+- Generado automáticamente en `Orden.save()`
+- El contador `NNN` es diario — reinicia desde `001` cada día
+- Usa `select_for_update()` para evitar duplicados bajo concurrencia
+
+---
+
+## Producción
 
 ```bash
-# Instalar dependencias de produccion
+# Instalar dependencias de producción
 pip install -r requirements/production.txt
 
-# Variable de entorno para settings de produccion
-set DJANGO_SETTINGS_MODULE=config.settings.production
+# Configurar settings de producción
+export DJANGO_SETTINGS_MODULE=config.settings.production
 
-# Colectar archivos estaticos
+# Colectar archivos estáticos
 python manage.py collectstatic
 
 # Correr con gunicorn
 gunicorn config.wsgi:application --bind 0.0.0.0:8000
 ```
+
+> En producción: configurar `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS` y `DEBUG=False` en el `.env`.
