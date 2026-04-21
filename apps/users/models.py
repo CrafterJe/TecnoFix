@@ -47,6 +47,11 @@ class Usuario(AuditableMixin, AbstractBaseUser, PermissionsMixin):
         verbose_name = 'Usuario'
         verbose_name_plural = 'Usuarios'
         ordering = ['nombre']
+        indexes = [
+            models.Index(fields=['rol'], name='idx_usuarios_rol'),
+            models.Index(fields=['activo'], name='idx_usuarios_activo'),
+            models.Index(fields=['rol', 'activo'], name='idx_usuarios_rol_activo'),
+        ]
 
     def __str__(self):
         return f'{self.nombre} ({self.get_rol_display()})'

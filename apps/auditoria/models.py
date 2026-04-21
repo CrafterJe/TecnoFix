@@ -37,6 +37,11 @@ class AuditLog(models.Model):
         verbose_name = 'Registro de auditoría'
         verbose_name_plural = 'Registros de auditoría'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['entity', 'entity_id'], name='idx_auditlog_entity'),
+            models.Index(fields=['action'], name='idx_auditlog_action'),
+            models.Index(fields=['created_at'], name='idx_auditlog_created_at'),
+        ]
 
     def __str__(self):
         user_str = self.user.nombre if self.user else 'Sistema'

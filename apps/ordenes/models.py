@@ -59,6 +59,11 @@ class Orden(AuditableMixin, BaseModel):
         verbose_name = 'Orden de servicio'
         verbose_name_plural = 'Órdenes de servicio'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['estado'], name='idx_ordenes_estado'),
+            models.Index(fields=['created_at'], name='idx_ordenes_created_at'),
+            models.Index(fields=['estado', 'created_at'], name='idx_ordenes_estado_fecha'),
+        ]
 
     def __str__(self):
         return f'{self.numero_orden} — {self.dispositivo}'
@@ -98,6 +103,9 @@ class Evidencia(AuditableMixin, BaseModel):
         verbose_name = 'Evidencia'
         verbose_name_plural = 'Evidencias'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['tipo'], name='idx_evidencias_tipo'),
+        ]
 
     def __str__(self):
         return f'Evidencia {self.get_tipo_display()} — {self.orden.numero_orden}'

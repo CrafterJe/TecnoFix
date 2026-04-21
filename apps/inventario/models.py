@@ -18,6 +18,11 @@ class Refaccion(AuditableMixin, BaseModel):
         verbose_name = 'Refacción'
         verbose_name_plural = 'Refacciones'
         ordering = ['nombre']
+        indexes = [
+            models.Index(fields=['nombre'], name='idx_refacciones_nombre'),
+            models.Index(fields=['categoria'], name='idx_refacciones_categoria'),
+            models.Index(fields=['stock'], name='idx_refacciones_stock'),
+        ]
 
     def __str__(self):
         return f'{self.nombre} (stock: {self.stock})'
@@ -43,6 +48,9 @@ class RefaccionCompatible(AuditableMixin, BaseModel):
         db_table = 'refacciones_compatibles'
         verbose_name = 'Compatibilidad de refacción'
         verbose_name_plural = 'Compatibilidades de refacciones'
+        indexes = [
+            models.Index(fields=['marca'], name='idx_refcompat_marca'),
+        ]
 
     def __str__(self):
         return f'{self.refaccion.nombre} → {self.marca} {self.modelo}'
