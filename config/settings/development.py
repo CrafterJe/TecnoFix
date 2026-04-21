@@ -10,9 +10,14 @@ MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']  # noqa
 
 INTERNAL_IPS = ['127.0.0.1', '::1']
 
-# Show SQL queries in console
-LOGGING['loggers']['django.db.backends'] = {  # noqa
+LOGGING['loggers']['core'] = {  # noqa
+    'handlers': ['file'],
+    'level': 'INFO',
+    'propagate': False,
+}
+
+LOGGING['loggers']['django.server'] = {  # noqa
     'handlers': ['console'],
-    'level': 'DEBUG',
+    'level': 'INFO',
     'propagate': False,
 }
