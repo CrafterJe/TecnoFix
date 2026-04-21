@@ -29,6 +29,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
 class UsuarioCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True)
+    rol = serializers.ChoiceField(choices=Usuario.ROL_CHOICES, default='recepcion', required=False)
 
     class Meta:
         model = Usuario

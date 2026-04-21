@@ -22,6 +22,11 @@ class Cliente(AuditableMixin, BaseModel):
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'
         ordering = ['nombre']
+        indexes = [
+            models.Index(fields=['nombre'], name='idx_clientes_nombre'),
+            models.Index(fields=['telefono'], name='idx_clientes_telefono'),
+            models.Index(fields=['email'], name='idx_clientes_email'),
+        ]
 
     def __str__(self):
         return self.nombre
@@ -51,6 +56,10 @@ class Dispositivo(AuditableMixin, BaseModel):
         verbose_name = 'Dispositivo'
         verbose_name_plural = 'Dispositivos'
         ordering = ['marca', 'modelo']
+        indexes = [
+            models.Index(fields=['tipo'], name='idx_dispositivos_tipo'),
+            models.Index(fields=['marca'], name='idx_dispositivos_marca'),
+        ]
 
     def __str__(self):
         return f'{self.marca} {self.modelo} ({self.get_tipo_display()}) — {self.cliente}'
