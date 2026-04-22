@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements/production.txt
 
 COPY . .
 
-RUN python manage.py collectstatic --noinput
+RUN DJANGO_SETTINGS_MODULE=config.settings.production SECRET_KEY=dummy python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
