@@ -28,6 +28,7 @@ ENV/
 .env
 .env.local
 .env.production
+.env.railway
 
 # Django
 *.log
