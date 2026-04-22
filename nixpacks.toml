@@ -1,5 +1,6 @@
 [phases.setup]
 nixPkgs = ["python311", "cairo", "pango", "gdk-pixbuf"]
+cmds = ["python3.11 -m ensurepip --upgrade"]
 
 [phases.install]
 cmds = ["python3.11 -m pip install -r requirements/production.txt"]
