@@ -5,5 +5,6 @@ django-cors-headers==4.4.0
 Pillow==10.4.0
 python-dotenv==1.0.1
 PyMySQL==1.1.1
+cryptography==42.0.8
 drf-spectacular==0.27.2
 cairosvg==2.7.1
