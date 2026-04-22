@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = ["python311", "mysql80", "pkg-config", "cairo", "pango", "gdk-pixbuf"]
+
+[phases.install]
+cmds = ["pip install -r requirements/production.txt"]
