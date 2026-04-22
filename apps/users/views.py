@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from core.permissions import IsAdmin, IsOwnerOrAdmin
@@ -59,8 +60,14 @@ class UsuarioViewSet(ModelViewSet):
 
         user.set_password(serializer.validated_data['password_nuevo'])
         user.save()
-        logger.info(f'Contraseña cambiada para usuario {user.email}')
-        return Response({'detail': 'Contraseña actualizada correctamente.'})
+        #logger.info(f'Contraseña cambiada para usuario {user.email}')
+
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'detail': 'Contraseña actualizada correctamente.',
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+        })
 
     @action(detail=True, methods=['post'])
     def activate(self, request, pk=None):
