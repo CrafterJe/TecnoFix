@@ -1,0 +1,191 @@
+{
+    "total_campos": 13,
+    "estructura": {
+        "id": {
+            "tipo": "int",
+            "ejemplo": 9469607837917
+        },
+        "title": {
+            "tipo": "str",
+            "ejemplo": "Batería de repuesto para iPhone 15 Pro (AmpSentrix Plus Extended)"
+        },
+        "handle": {
+            "tipo": "str",
+            "ejemplo": "bateria-de-repuesto-para-iphone-15-pro-ampsentrix-plus-extended"
+        },
+        "body_html": {
+            "tipo": "str",
+            "ejemplo": "<p>Batería de repuesto para iPhone 15 Pro (AmpSentrix Plus Extended)</p>"
+        },
+        "published_at": {
+            "tipo": "str",
+            "ejemplo": "2026-04-18T09:29:52-06:00"
+        },
+        "created_at": {
+            "tipo": "str",
+            "ejemplo": "2026-04-18T09:28:21-06:00"
+        },
+        "updated_at": {
+            "tipo": "str",
+            "ejemplo": "2026-04-23T20:57:47-06:00"
+        },
+        "vendor": {
+            "tipo": "str",
+            "ejemplo": "Supratecmx"
+        },
+        "product_type": {
+            "tipo": "str",
+            "ejemplo": "Baterias apple"
+        },
+        "tags": {
+            "tipo": "list",
+            "elemento": {
+                "tipo": "str",
+                "ejemplo": "Baterias apple"
+            }
+        },
+        "variants": {
+            "tipo": "list",
+            "elemento": {
+                "tipo": "dict",
+                "campos": {
+                    "id": {
+                        "tipo": "int",
+                        "ejemplo": 47821658095837
+                    },
+                    "title": {
+                        "tipo": "str",
+                        "ejemplo": "Default Title"
+                    },
+                    "option1": {
+                        "tipo": "str",
+                        "ejemplo": "Default Title"
+                    },
+                    "option2": {
+                        "tipo": "null",
+                        "ejemplo": null
+                    },
+                    "option3": {
+                        "tipo": "null",
+                        "ejemplo": null
+                    },
+                    "sku": {
+                        "tipo": "str",
+                        "ejemplo": "107282215094"
+                    },
+                    "requires_shipping": {
+                        "tipo": "bool",
+                        "ejemplo": true
+                    },
+                    "taxable": {
+                        "tipo": "bool",
+                        "ejemplo": false
+                    },
+                    "featured_image": {
+                        "tipo": "null",
+                        "ejemplo": null
+                    },
+                    "available": {
+                        "tipo": "bool",
+                        "ejemplo": true
+                    },
+                    "price": {
+                        "tipo": "str",
+                        "ejemplo": "869.00"
+                    },
+                    "grams": {
+                        "tipo": "int",
+                        "ejemplo": 0
+                    },
+                    "compare_at_price": {
+                        "tipo": "null",
+                        "ejemplo": null
+                    },
+                    "position": {
+                        "tipo": "int",
+                        "ejemplo": 1
+                    },
+                    "product_id": {
+                        "tipo": "int",
+                        "ejemplo": 9469607837917
+                    },
+                    "created_at": {
+                        "tipo": "str",
+                        "ejemplo": "2026-04-18T09:28:22-06:00"
+                    },
+                    "updated_at": {
+                        "tipo": "str",
+                        "ejemplo": "2026-04-23T20:57:47-06:00"
+                    }
+                }
+            }
+        },
+        "images": {
+            "tipo": "list",
+            "elemento": {
+                "tipo": "dict",
+                "campos": {
+                    "id": {
+                        "tipo": "int",
+                        "ejemplo": 46826727407837
+                    },
+                    "created_at": {
+                        "tipo": "str",
+                        "ejemplo": "2026-04-18T09:29:36-06:00"
+                    },
+                    "position": {
+                        "tipo": "int",
+                        "ejemplo": 1
+                    },
+                    "updated_at": {
+                        "tipo": "str",
+                        "ejemplo": "2026-04-18T09:29:38-06:00"
+                    },
+                    "product_id": {
+                        "tipo": "int",
+                        "ejemplo": 9469607837917
+                    },
+                    "variant_ids": {
+                        "tipo": "list",
+                        "elemento": "vacío"
+                    },
+                    "src": {
+                        "tipo": "str",
+                        "ejemplo": "https://cdn.shopify.com/s/files/1/0654/6623/7149/files/Captura_de_pantalla_2026-04-18_a_la_s_9.29.23_a.m..png?v=17765261..."
+                    },
+                    "width": {
+                        "tipo": "int",
+                        "ejemplo": 478
+                    },
+                    "height": {
+                        "tipo": "int",
+                        "ejemplo": 512
+                    }
+                }
+            }
+        },
+        "options": {
+            "tipo": "list",
+            "elemento": {
+                "tipo": "dict",
+                "campos": {
+                    "name": {
+                        "tipo": "str",
+                        "ejemplo": "Title"
+                    },
+                    "position": {
+                        "tipo": "int",
+                        "ejemplo": 1
+                    },
+                    "values": {
+                        "tipo": "list",
+                        "elemento": {
+                            "tipo": "str",
+                            "ejemplo": "Default Title"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

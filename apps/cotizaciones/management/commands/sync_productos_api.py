@@ -1,0 +1,341 @@
+"""
+Comando interactivo para sincronizar productos desde las APIs externas
+hacia la tabla local api_productos_catalogo.
+
+Las fuentes ya no están hardcodeadas: se leen desde la tabla FuenteApi (activas).
+Cada fuente tiene un `tipo_parser` que decide qué estrategia usar para parsear sus productos.
+
+Para agregar una API nueva:
+  1. Crear el registro FuenteApi desde admin (slug, nombre, base_url, tipo_parser).
+  2. Si la API usa un formato distinto al ya soportado, implementar un nuevo fetcher
+     debajo en PARSERS.
+
+Uso: python manage.py sync_productos_api
+"""
+import time
+from decimal import Decimal, InvalidOperation
+
+import requests
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+
+from apps.cotizaciones.models import ApiProductoCatalogo, FuenteApi
+
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+}
+
+LIMITE_POR_PAGINA = 250
+PAUSA_ENTRE_PAGINAS = 1
+
+
+# ─────────────────────────────────────────────
+#  Fetchers (strategy pattern por tipo_parser)
+# ─────────────────────────────────────────────
+
+class BaseFetcher:
+    """Contrato común para todos los fetchers."""
+    tipo_parser = None  # override en subclases
+
+    def __init__(self, fuente: FuenteApi, stdout, style):
+        self.fuente = fuente
+        self.stdout = stdout
+        self.style = style
+
+    def fetch_all(self) -> list:
+        """Descarga TODOS los productos crudos. Devuelve lista de dicts."""
+        raise NotImplementedError
+
+    def fetch_first_page(self) -> list:
+        """Descarga solo la primera página (para probar conexión)."""
+        raise NotImplementedError
+
+    def parse(self, raw: dict, ahora) -> ApiProductoCatalogo:
+        """Convierte un producto crudo en una instancia de ApiProductoCatalogo (no guardada)."""
+        raise NotImplementedError
+
+
+class ShopifyV1Fetcher(BaseFetcher):
+    """Fetcher para tiendas Shopify (FixOEM, SupraTec, etc.)."""
+    tipo_parser = 'shopify_v1'
+
+    def _request_page(self, page):
+        url = f'{self.fuente.base_url.rstrip("/")}/products.json?limit={LIMITE_POR_PAGINA}&page={page}'
+        response = requests.get(url, headers=HEADERS, timeout=30)
+        response.raise_for_status()
+        return response.json().get('products', [])
+
+    def fetch_first_page(self):
+        return self._request_page(1)
+
+    def fetch_all(self):
+        todos = []
+        page = 1
+        while True:
+            try:
+                data = self._request_page(page)
+            except requests.RequestException as exc:
+                self.stdout.write(self.style.ERROR(
+                    f'  Error en página {page}: {exc}'
+                ))
+                break
+
+            if not data:
+                self.stdout.write('  Sin más productos.')
+                break
+
+            todos.extend(data)
+            self.stdout.write(
+                f'  Página {page}: +{len(data)} productos (acumulado: {len(todos)})'
+            )
+            page += 1
+            time.sleep(PAUSA_ENTRE_PAGINAS)
+        return todos
+
+    def parse(self, raw, ahora):
+        producto_id = raw.get('id')
+        title = (raw.get('title') or '').strip()
+        if not producto_id or not title:
+            return None
+
+        variants = raw.get('variants') or []
+        if not variants:
+            return None
+        v = variants[0]
+
+        try:
+            precio = Decimal(str(v.get('price') or '0'))
+        except InvalidOperation:
+            precio = Decimal('0')
+
+        return ApiProductoCatalogo(
+            fuente=self.fuente,
+            producto_id_externo=producto_id,
+            titulo=title[:500],
+            precio=precio,
+            disponible=bool(v.get('available')),
+            handle=(raw.get('handle') or '')[:300],
+            vendor=(raw.get('vendor') or '')[:200],
+            product_type=(raw.get('product_type') or '')[:200],
+            synced_at=ahora,
+        )
+
+
+# Registry de parsers disponibles.
+PARSERS = {
+    ShopifyV1Fetcher.tipo_parser: ShopifyV1Fetcher,
+}
+
+
+def get_fetcher(fuente: FuenteApi, stdout, style) -> BaseFetcher:
+    cls = PARSERS.get(fuente.tipo_parser)
+    if cls is None:
+        raise ValueError(
+            f'No hay parser registrado para tipo_parser="{fuente.tipo_parser}" '
+            f'(fuente: {fuente.nombre}). Implementa una subclase de BaseFetcher.'
+        )
+    return cls(fuente, stdout, style)
+
+
+# ─────────────────────────────────────────────
+#  Comando
+# ─────────────────────────────────────────────
+
+class Command(BaseCommand):
+    help = 'Sincroniza productos desde APIs externas al catálogo local.'
+
+    def handle(self, *args, **options):
+        self._mostrar_menu()
+
+    # ──────────────────────────────────────────
+    #  Menú dinámico
+    # ──────────────────────────────────────────
+    def _mostrar_menu(self):
+        while True:
+            fuentes = list(FuenteApi.objects.filter(activo=True).order_by('orden', 'nombre'))
+
+            self.stdout.write('\n' + '=' * 60)
+            self.stdout.write(self.style.SUCCESS('  TecnoFix — Sincronización de productos API'))
+            self.stdout.write('=' * 60)
+
+            if not fuentes:
+                self.stdout.write(self.style.WARNING(
+                    '  No hay fuentes API activas. Regístralas en /admin/cotizaciones/fuenteapi/'
+                ))
+                self.stdout.write('  0. Salir')
+                self.stdout.write('-' * 60)
+                if input('  Opción: ').strip() == '0':
+                    return
+                continue
+
+            self.stdout.write('  1. Sincronizar TODAS las fuentes activas')
+            for idx, fuente in enumerate(fuentes, start=2):
+                self.stdout.write(f'  {idx}. Sincronizar solo {fuente.nombre}')
+            self.stdout.write(f'  {len(fuentes) + 2}. Probar conexión (sin guardar)')
+            self.stdout.write(f'  {len(fuentes) + 3}. Ver estadísticas del catálogo local')
+            self.stdout.write(f'  {len(fuentes) + 4}. Eliminar TODOS los productos del catálogo')
+            self.stdout.write('  0. Salir')
+            self.stdout.write('-' * 60)
+
+            opcion = input('  Opción: ').strip()
+
+            if opcion == '0':
+                self.stdout.write(self.style.SUCCESS('\n  ¡Hasta luego!\n'))
+                return
+            if opcion == '1':
+                self._sincronizar(fuentes)
+                continue
+            if opcion == str(len(fuentes) + 2):
+                self._probar_conexion(fuentes)
+                continue
+            if opcion == str(len(fuentes) + 3):
+                self._mostrar_estadisticas()
+                continue
+            if opcion == str(len(fuentes) + 4):
+                self._eliminar_catalogo()
+                continue
+
+            try:
+                idx_fuente = int(opcion) - 2
+                if 0 <= idx_fuente < len(fuentes):
+                    self._sincronizar([fuentes[idx_fuente]])
+                    continue
+            except ValueError:
+                pass
+            self.stdout.write(self.style.WARNING('  Opción no válida.'))
+
+    # ──────────────────────────────────────────
+    #  Operaciones
+    # ──────────────────────────────────────────
+    def _sincronizar(self, fuentes):
+        total_global = 0
+        for fuente in fuentes:
+            self.stdout.write('\n' + '=' * 60)
+            self.stdout.write(self.style.SUCCESS(f'  Sincronizando: {fuente.nombre} ({fuente.tipo_parser})'))
+            self.stdout.write('=' * 60)
+
+            try:
+                fetcher = get_fetcher(fuente, self.stdout, self.style)
+            except ValueError as exc:
+                self.stdout.write(self.style.ERROR(f'  {exc}'))
+                continue
+
+            productos = fetcher.fetch_all()
+            if not productos:
+                self.stdout.write(self.style.WARNING('  Sin productos descargados.'))
+                continue
+
+            guardados, errores = self._guardar_productos(productos, fetcher)
+            total_global += guardados
+
+            self.stdout.write(self.style.SUCCESS(
+                f'\n  {fuente.nombre}: {guardados} guardados, {errores} errores.'
+            ))
+
+        self.stdout.write(self.style.SUCCESS(
+            f'\n  Total escrito en BD: {total_global} productos.'
+        ))
+
+    def _probar_conexion(self, fuentes):
+        self.stdout.write('\n  Probando conexión a las fuentes activas...\n')
+        for fuente in fuentes:
+            try:
+                fetcher = get_fetcher(fuente, self.stdout, self.style)
+                productos = fetcher.fetch_first_page()
+                self.stdout.write(self.style.SUCCESS(
+                    f'  OK  {fuente.nombre}: {len(productos)} productos en página 1'
+                ))
+            except Exception as exc:
+                self.stdout.write(self.style.ERROR(
+                    f'  ERR {fuente.nombre}: {exc}'
+                ))
+
+    def _mostrar_estadisticas(self):
+        total = ApiProductoCatalogo.objects.count()
+        if total == 0:
+            self.stdout.write(self.style.WARNING(
+                '\n  No hay productos en el catálogo local.'
+            ))
+            return
+
+        self.stdout.write(f'\n  Total de productos en catálogo: {total}')
+        for fuente in FuenteApi.objects.all().order_by('orden', 'nombre'):
+            count = ApiProductoCatalogo.objects.filter(fuente=fuente).count()
+            disponibles = ApiProductoCatalogo.objects.filter(
+                fuente=fuente, disponible=True,
+            ).count()
+            self.stdout.write(
+                f'    - {fuente.nombre} ({fuente.slug}): {count} productos ({disponibles} disponibles)'
+            )
+
+        ultima = ApiProductoCatalogo.objects.order_by('-synced_at').first()
+        if ultima:
+            self.stdout.write(f'\n  Última sincronización: {ultima.synced_at}')
+
+    def _eliminar_catalogo(self):
+        total = ApiProductoCatalogo.objects.count()
+        if total == 0:
+            self.stdout.write(self.style.WARNING(
+                '\n  El catálogo ya está vacío.'
+            ))
+            return
+
+        confirm = input(
+            self.style.WARNING(
+                f'\n  ¿Eliminar {total} productos del catálogo? (s/N): '
+            )
+        ).strip().lower()
+        if confirm != 's':
+            self.stdout.write('  Cancelado.')
+            return
+
+        eliminados, _ = ApiProductoCatalogo.objects.all().delete()
+        self.stdout.write(self.style.SUCCESS(
+            f'  {eliminados} producto(s) eliminado(s).'
+        ))
+
+    # ──────────────────────────────────────────
+    #  Persistencia (bulk_create con upsert)
+    # ──────────────────────────────────────────
+    def _guardar_productos(self, productos, fetcher: BaseFetcher):
+        BATCH = 500
+        total = len(productos)
+        ahora = timezone.now()
+
+        self.stdout.write(f'  Parseando {total} productos...')
+        objs = []
+        errores = 0
+
+        for raw in productos:
+            try:
+                obj = fetcher.parse(raw, ahora)
+            except Exception as exc:
+                errores += 1
+                self.stdout.write(self.style.ERROR(
+                    f'  [ERR] {raw.get("title", "?")}: {exc}'
+                ))
+                continue
+
+            if obj is None:
+                errores += 1
+            else:
+                objs.append(obj)
+
+        if not objs:
+            self.stdout.write(self.style.WARNING('  Ningún producto válido para guardar.'))
+            return 0, errores
+
+        self.stdout.write(f'  Guardando en BD en lotes de {BATCH}...')
+
+        guardados = 0
+        for i in range(0, len(objs), BATCH):
+            lote = objs[i:i + BATCH]
+            resultado = ApiProductoCatalogo.objects.bulk_create(
+                lote,
+                update_conflicts=True,
+                update_fields=['titulo', 'precio', 'disponible', 'handle', 'vendor', 'product_type', 'synced_at'],
+            )
+            guardados += len(resultado)
+            self.stdout.write(f'  Lote {i // BATCH + 1}: {len(resultado)} registros guardados.')
+
+        return guardados, errores
