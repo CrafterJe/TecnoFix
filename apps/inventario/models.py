@@ -22,6 +22,7 @@ class Refaccion(AuditableMixin, BaseModel):
             models.Index(fields=['nombre'], name='idx_refacciones_nombre'),
             models.Index(fields=['categoria'], name='idx_refacciones_categoria'),
             models.Index(fields=['stock'], name='idx_refacciones_stock'),
+            models.Index(fields=['stock', 'stock_minimo'], name='idx_refacciones_stock_min'),
         ]
 
     def __str__(self):

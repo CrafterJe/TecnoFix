@@ -271,11 +271,12 @@ class FuenteApi(AuditableMixin, BaseModel):
     """
     PARSER_CHOICES = [
         ('shopify_v1', 'Shopify v1 (products.json paginado)'),
+        ('athome_v1', 'AtHome v1 (archivos JSON locales)'),
     ]
 
     slug = models.SlugField('Slug', max_length=50, unique=True, blank=True, help_text='Identificador interno único (ej: fixoem). Se auto-genera del nombre si va vacío.')
     nombre = models.CharField('Nombre', max_length=100, help_text='Nombre visible (ej: FixOEM).')
-    base_url = models.URLField('URL base', help_text='URL raíz de la tienda. Ej: https://fixoem.com')
+    base_url = models.CharField('URL / ruta base', max_length=500, help_text='URL raíz (Shopify) o ruta al directorio de archivos JSON (AtHome). Ej: https://fixoem.com o C:\\datos\\athome')
     tipo_parser = models.CharField(
         'Tipo de parser', max_length=20, choices=PARSER_CHOICES, default='shopify_v1',
         help_text='Estrategia para descargar/parsear productos.',
@@ -397,13 +398,14 @@ class ApiProductoCatalogo(BaseModel):
         related_name='productos',
         verbose_name='Fuente',
     )
-    producto_id_externo = models.BigIntegerField('ID externo')
+    producto_id_externo = models.CharField('ID / SKU externo', max_length=100)
     titulo = models.CharField('Título', max_length=500)
     precio = models.DecimalField('Precio', max_digits=10, decimal_places=2)
     disponible = models.BooleanField('Disponible', default=False)
     handle = models.CharField('Handle', max_length=300, blank=True)
     vendor = models.CharField('Vendor', max_length=200, blank=True)
     product_type = models.CharField('Tipo de producto', max_length=200, blank=True)
+    url_producto = models.URLField('URL del producto', max_length=500, blank=True)
     synced_at = models.DateTimeField('Sincronizado en', auto_now=True)
 
     class Meta:
@@ -421,6 +423,7 @@ class ApiProductoCatalogo(BaseModel):
             models.Index(fields=['fuente'], name='idx_apiproducto_fuente'),
             models.Index(fields=['disponible'], name='idx_apiproducto_disponible'),
             models.Index(fields=['titulo'], name='idx_apiproducto_titulo'),
+            models.Index(fields=['fuente', 'disponible'], name='idx_apiproducto_fuente_disp'),
         ]
 
     def __str__(self):

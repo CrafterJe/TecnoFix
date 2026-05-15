@@ -12,10 +12,13 @@ Para agregar una API nueva:
 
 Uso: python manage.py sync_productos_api
 """
+import json
 import time
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 import requests
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -110,13 +113,86 @@ class ShopifyV1Fetcher(BaseFetcher):
 
         return ApiProductoCatalogo(
             fuente=self.fuente,
-            producto_id_externo=producto_id,
+            producto_id_externo=str(producto_id),
             titulo=title[:500],
             precio=precio,
             disponible=bool(v.get('available')),
             handle=(raw.get('handle') or '')[:300],
             vendor=(raw.get('vendor') or '')[:200],
             product_type=(raw.get('product_type') or '')[:200],
+            url_producto='',
+            synced_at=ahora,
+        )
+
+
+class AtHomeV1Fetcher(BaseFetcher):
+    """Fetcher para AtHome: lee archivos JSON locales (catalogo_athome_parteXXX.json)."""
+    tipo_parser = 'athome_v1'
+
+    def _get_directorio(self) -> Path:
+        ruta = self.fuente.base_url
+        p = Path(ruta)
+        if p.is_absolute():
+            return p
+        return Path(settings.BASE_DIR) / ruta
+
+    def _leer_archivo(self, archivo: Path) -> list:
+        with open(archivo, encoding='utf-8') as f:
+            return json.load(f)
+
+    def _listar_archivos(self) -> list[Path]:
+        directorio = self._get_directorio()
+        if not directorio.is_dir():
+            raise FileNotFoundError(
+                f'No se encontró el directorio de AtHome: {directorio}\n'
+                'Actualiza base_url en /admin/cotizaciones/fuenteapi/'
+            )
+        archivos = sorted(directorio.glob('catalogo_athome_parte*.json'))
+        if not archivos:
+            raise FileNotFoundError(
+                f'No hay archivos catalogo_athome_parteXXX.json en {directorio}'
+            )
+        return archivos
+
+    def fetch_first_page(self) -> list:
+        archivos = self._listar_archivos()
+        return self._leer_archivo(archivos[0])
+
+    def fetch_all(self) -> list:
+        archivos = self._listar_archivos()
+        todos = []
+        for archivo in archivos:
+            try:
+                datos = self._leer_archivo(archivo)
+                todos.extend(datos)
+                self.stdout.write(
+                    f'  {archivo.name}: +{len(datos)} productos (acumulado: {len(todos)})'
+                )
+            except Exception as exc:
+                self.stdout.write(self.style.ERROR(f'  Error leyendo {archivo.name}: {exc}'))
+        return todos
+
+    def parse(self, raw: dict, ahora) -> ApiProductoCatalogo:
+        sku = str(raw.get('sku') or '').strip()
+        nombre = (raw.get('nombre') or '').strip()
+        if not sku or not nombre:
+            return None
+
+        try:
+            precio = Decimal(str(raw.get('precio') or '0'))
+        except InvalidOperation:
+            precio = Decimal('0')
+
+        return ApiProductoCatalogo(
+            fuente=self.fuente,
+            producto_id_externo=sku[:100],
+            titulo=nombre[:500],
+            precio=precio,
+            disponible=bool(raw.get('disponible')),
+            handle='',
+            vendor='',
+            product_type='',
+            url_producto=(raw.get('url') or '')[:500],
             synced_at=ahora,
         )
 
@@ -124,6 +200,7 @@ class ShopifyV1Fetcher(BaseFetcher):
 # Registry de parsers disponibles.
 PARSERS = {
     ShopifyV1Fetcher.tipo_parser: ShopifyV1Fetcher,
+    AtHomeV1Fetcher.tipo_parser: AtHomeV1Fetcher,
 }
 
 
@@ -333,7 +410,7 @@ class Command(BaseCommand):
             resultado = ApiProductoCatalogo.objects.bulk_create(
                 lote,
                 update_conflicts=True,
-                update_fields=['titulo', 'precio', 'disponible', 'handle', 'vendor', 'product_type', 'synced_at'],
+                update_fields=['titulo', 'precio', 'disponible', 'handle', 'vendor', 'product_type', 'url_producto', 'synced_at'],
             )
             guardados += len(resultado)
             self.stdout.write(f'  Lote {i // BATCH + 1}: {len(resultado)} registros guardados.')

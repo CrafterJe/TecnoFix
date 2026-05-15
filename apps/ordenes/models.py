@@ -63,6 +63,7 @@ class Orden(AuditableMixin, BaseModel):
             models.Index(fields=['estado'], name='idx_ordenes_estado'),
             models.Index(fields=['created_at'], name='idx_ordenes_created_at'),
             models.Index(fields=['estado', 'created_at'], name='idx_ordenes_estado_fecha'),
+            models.Index(fields=['estado', 'assigned_to'], name='idx_ordenes_estado_assigned'),
         ]
 
     def __str__(self):

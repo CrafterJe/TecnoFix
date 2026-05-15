@@ -157,7 +157,7 @@ class ApiProductoCatalogoSerializer(serializers.ModelSerializer):
             'id', 'fuente',
             'producto_id_externo', 'titulo', 'precio',
             'disponible', 'handle', 'vendor', 'product_type',
-            'synced_at',
+            'url_producto', 'synced_at',
         ]
 
 

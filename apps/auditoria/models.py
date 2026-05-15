@@ -41,6 +41,7 @@ class AuditLog(models.Model):
             models.Index(fields=['entity', 'entity_id'], name='idx_auditlog_entity'),
             models.Index(fields=['action'], name='idx_auditlog_action'),
             models.Index(fields=['created_at'], name='idx_auditlog_created_at'),
+            models.Index(fields=['action', 'entity'], name='idx_auditlog_action_entity'),
         ]
 
     def __str__(self):

@@ -1,0 +1,40 @@
+{
+  "descripcion": "Estructura de cada objeto en los archivos catalogo_athome_parteXXX.json",
+  "total_variantes": 9996,
+  "total_archivos": 20,
+  "productos_por_archivo": 500,
+  "campos": {
+    "nombre": {
+      "tipo": "string",
+      "descripcion": "Nombre del producto"
+    },
+    "sku": {
+      "tipo": "string",
+      "descripcion": "Código SKU del producto"
+    },
+    "precio": {
+      "tipo": "number",
+      "descripcion": "Precio en MXN"
+    },
+    "stock": {
+      "tipo": "integer",
+      "descripcion": "Unidades disponibles en inventario"
+    },
+    "disponible": {
+      "tipo": "boolean",
+      "descripcion": "True si tiene stock (InStock), False si agotado"
+    },
+    "url": {
+      "tipo": "string",
+      "descripcion": "URL completa del producto en la tienda"
+    }
+  },
+  "ejemplo": {
+    "nombre": "MICA HIDROGEL RELIFE GF-3R MATTE PRIVACY",
+    "sku": "14339",
+    "precio": 1289.98,
+    "stock": 3,
+    "disponible": true,
+    "url": "https://www.athomemx.mx/productos/mica-hidrogel-relife-gf-3r-matte-privacy-vd81i/"
+  }
+}
