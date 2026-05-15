@@ -8,3 +8,5 @@ PyMySQL==1.1.1
 cryptography==42.0.8
 drf-spectacular==0.27.2
 cairosvg==2.7.1
+reportlab==4.2.2
+requests==2.32.3

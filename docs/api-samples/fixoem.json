@@ -1,0 +1,188 @@
+{
+    "total_campos": 13,
+    "estructura": {
+        "id": {
+            "tipo": "int",
+            "ejemplo": 10092789661986
+        },
+        "title": {
+            "tipo": "str",
+            "ejemplo": "Socket ISP V2 Programadora F64"
+        },
+        "handle": {
+            "tipo": "str",
+            "ejemplo": "socket-isp-v2-programadora-f64"
+        },
+        "body_html": {
+            "tipo": "str",
+            "ejemplo": "Categoría: Herramienta\nModelos Compatibles:\n        1. F64\nDetalles:\n        1. Socket ISP V2 Programadora\n        2. Pr..."
+        },
+        "published_at": {
+            "tipo": "str",
+            "ejemplo": "2026-04-23T14:27:46-06:00"
+        },
+        "created_at": {
+            "tipo": "str",
+            "ejemplo": "2026-04-23T14:27:45-06:00"
+        },
+        "updated_at": {
+            "tipo": "str",
+            "ejemplo": "2026-04-23T20:56:48-06:00"
+        },
+        "vendor": {
+            "tipo": "str",
+            "ejemplo": "FixOEM:Refaccion Celular"
+        },
+        "product_type": {
+            "tipo": "str",
+            "ejemplo": ""
+        },
+        "tags": {
+            "tipo": "list",
+            "elemento": "vacío"
+        },
+        "variants": {
+            "tipo": "list",
+            "elemento": {
+                "tipo": "dict",
+                "campos": {
+                    "id": {
+                        "tipo": "int",
+                        "ejemplo": 51564108874018
+                    },
+                    "title": {
+                        "tipo": "str",
+                        "ejemplo": "Default Title"
+                    },
+                    "option1": {
+                        "tipo": "str",
+                        "ejemplo": "Default Title"
+                    },
+                    "option2": {
+                        "tipo": "null",
+                        "ejemplo": null
+                    },
+                    "option3": {
+                        "tipo": "null",
+                        "ejemplo": null
+                    },
+                    "sku": {
+                        "tipo": "str",
+                        "ejemplo": "4980"
+                    },
+                    "requires_shipping": {
+                        "tipo": "bool",
+                        "ejemplo": true
+                    },
+                    "taxable": {
+                        "tipo": "bool",
+                        "ejemplo": true
+                    },
+                    "featured_image": {
+                        "tipo": "null",
+                        "ejemplo": null
+                    },
+                    "available": {
+                        "tipo": "bool",
+                        "ejemplo": false
+                    },
+                    "price": {
+                        "tipo": "str",
+                        "ejemplo": "2500.00"
+                    },
+                    "grams": {
+                        "tipo": "int",
+                        "ejemplo": 100
+                    },
+                    "compare_at_price": {
+                        "tipo": "null",
+                        "ejemplo": null
+                    },
+                    "position": {
+                        "tipo": "int",
+                        "ejemplo": 1
+                    },
+                    "product_id": {
+                        "tipo": "int",
+                        "ejemplo": 10092789661986
+                    },
+                    "created_at": {
+                        "tipo": "str",
+                        "ejemplo": "2026-04-23T14:27:45-06:00"
+                    },
+                    "updated_at": {
+                        "tipo": "str",
+                        "ejemplo": "2026-04-23T20:56:48-06:00"
+                    }
+                }
+            }
+        },
+        "images": {
+            "tipo": "list",
+            "elemento": {
+                "tipo": "dict",
+                "campos": {
+                    "id": {
+                        "tipo": "int",
+                        "ejemplo": 63716694098210
+                    },
+                    "created_at": {
+                        "tipo": "str",
+                        "ejemplo": "2026-04-23T14:27:18-06:00"
+                    },
+                    "position": {
+                        "tipo": "int",
+                        "ejemplo": 1
+                    },
+                    "updated_at": {
+                        "tipo": "str",
+                        "ejemplo": "2026-04-23T14:27:20-06:00"
+                    },
+                    "product_id": {
+                        "tipo": "int",
+                        "ejemplo": 10092789661986
+                    },
+                    "variant_ids": {
+                        "tipo": "list",
+                        "elemento": "vacío"
+                    },
+                    "src": {
+                        "tipo": "str",
+                        "ejemplo": "https://cdn.shopify.com/s/files/1/0263/3075/9243/files/productonuevo_fd3f719a-0f3b-42c2-82fd-88fc8b33e9e4.jpg?v=17769760..."
+                    },
+                    "width": {
+                        "tipo": "int",
+                        "ejemplo": 600
+                    },
+                    "height": {
+                        "tipo": "int",
+                        "ejemplo": 600
+                    }
+                }
+            }
+        },
+        "options": {
+            "tipo": "list",
+            "elemento": {
+                "tipo": "dict",
+                "campos": {
+                    "name": {
+                        "tipo": "str",
+                        "ejemplo": "Title"
+                    },
+                    "position": {
+                        "tipo": "int",
+                        "ejemplo": 1
+                    },
+                    "values": {
+                        "tipo": "list",
+                        "elemento": {
+                            "tipo": "str",
+                            "ejemplo": "Default Title"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -13,6 +13,7 @@ api_v1_patterns = [
     path('clientes/', include('apps.clientes.urls')),
     path('ordenes/', include('apps.ordenes.urls')),
     path('inventario/', include('apps.inventario.urls')),
+    path('cotizaciones/', include('apps.cotizaciones.urls')),
     path('auditoria/', include('apps.auditoria.urls')),
     # Docs
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
