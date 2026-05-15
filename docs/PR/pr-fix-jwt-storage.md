@@ -42,7 +42,7 @@ En `production.py`, al definir `STORAGES` solo se incluía `staticfiles` (para w
 # Fix 1: Verificar que el refresh token dura 30 días
 # 1. Hacer login
 POST /api/v1/users/auth/login/
-{ "email": "tecnico1@tecnofix.com", "password": "Tecnico2024!" }
+{ "email": "<email_usuario>", "password": "<password>" }
 
 # 2. Verificar que el token tiene exp a 30 días desde ahora
 # Decodificar el refresh token en jwt.io → campo "exp"
