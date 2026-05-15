@@ -32,6 +32,9 @@ INSTALLED_APPS = [
     'apps.cotizaciones',
 ]
 
+# Caché de preflight CORS en el browser (24h). Evita OPTIONS extra por request.
+CORS_PREFLIGHT_MAX_AGE = 86400
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
