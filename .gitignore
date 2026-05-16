@@ -38,6 +38,9 @@ db.sqlite3-journal
 media/
 staticfiles/
 
+# Datos locales (catálogos AtHome y similares — pesados, regenerables)
+data/
+
 # IDE
 .vscode/
 .idea/

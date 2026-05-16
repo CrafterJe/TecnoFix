@@ -1,5 +1,5 @@
 """
-Comando interactivo para sincronizar productos desde las APIs externas
+Comando para sincronizar productos desde las APIs externas
 hacia la tabla local api_productos_catalogo.
 
 Las fuentes ya no están hardcodeadas: se leen desde la tabla FuenteApi (activas).
@@ -10,7 +10,12 @@ Para agregar una API nueva:
   2. Si la API usa un formato distinto al ya soportado, implementar un nuevo fetcher
      debajo en PARSERS.
 
-Uso: python manage.py sync_productos_api
+Uso interactivo (default — menú numerado):
+    python manage.py sync_productos_api
+
+Uso no interactivo (para cron / automatización):
+    python manage.py sync_productos_api --all-active --no-interactive
+    python manage.py sync_productos_api --fuente fixoem --no-interactive
 """
 import json
 import time
@@ -221,8 +226,67 @@ def get_fetcher(fuente: FuenteApi, stdout, style) -> BaseFetcher:
 class Command(BaseCommand):
     help = 'Sincroniza productos desde APIs externas al catálogo local.'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--fuente',
+            type=str,
+            default=None,
+            help='Slug de una FuenteApi específica a sincronizar (ej: fixoem). Mutuamente excluyente con --all-active.',
+        )
+        parser.add_argument(
+            '--all-active',
+            action='store_true',
+            default=False,
+            help='Sincroniza todas las fuentes activas. Pensado para cron jobs.',
+        )
+        parser.add_argument(
+            '--no-interactive',
+            action='store_true',
+            default=False,
+            help='No muestra el menú interactivo. Requiere --fuente o --all-active.',
+        )
+
     def handle(self, *args, **options):
+        fuente_slug = options.get('fuente')
+        all_active = options.get('all_active')
+        no_interactive = options.get('no_interactive')
+
+        if no_interactive or fuente_slug or all_active:
+            self._handle_no_interactive(fuente_slug, all_active)
+            return
+
         self._mostrar_menu()
+
+    def _handle_no_interactive(self, fuente_slug, all_active):
+        if fuente_slug and all_active:
+            self.stdout.write(self.style.ERROR(
+                '  --fuente y --all-active son mutuamente excluyentes.'
+            ))
+            return
+
+        if all_active:
+            fuentes = list(FuenteApi.objects.filter(activo=True).order_by('orden', 'nombre'))
+            if not fuentes:
+                self.stdout.write(self.style.WARNING(
+                    '  No hay fuentes API activas. Nada que sincronizar.'
+                ))
+                return
+        elif fuente_slug:
+            try:
+                fuente = FuenteApi.objects.get(slug=fuente_slug, activo=True)
+            except FuenteApi.DoesNotExist:
+                self.stdout.write(self.style.ERROR(
+                    f'  No existe una FuenteApi activa con slug="{fuente_slug}".'
+                ))
+                return
+            fuentes = [fuente]
+        else:
+            self.stdout.write(self.style.ERROR(
+                '  Modo no interactivo requiere --fuente <slug> o --all-active.'
+            ))
+            return
+
+        self._sincronizar(fuentes)
 
     # ──────────────────────────────────────────
     #  Menú dinámico
@@ -286,6 +350,7 @@ class Command(BaseCommand):
     # ──────────────────────────────────────────
     def _sincronizar(self, fuentes):
         total_global = 0
+        total_marcados = 0
         for fuente in fuentes:
             self.stdout.write('\n' + '=' * 60)
             self.stdout.write(self.style.SUCCESS(f'  Sincronizando: {fuente.nombre} ({fuente.tipo_parser})'))
@@ -297,21 +362,53 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f'  {exc}'))
                 continue
 
-            productos = fetcher.fetch_all()
+            sync_started_at = timezone.now()
+
+            try:
+                productos = fetcher.fetch_all()
+            except Exception as exc:
+                self.stdout.write(self.style.ERROR(
+                    f'  Error obteniendo productos: {exc}\n'
+                    '  Saltando mark-and-sweep para evitar marcar catálogo como agotado por fallo temporal.'
+                ))
+                continue
+
             if not productos:
-                self.stdout.write(self.style.WARNING('  Sin productos descargados.'))
+                self.stdout.write(self.style.WARNING(
+                    '  Sin productos descargados. Saltando mark-and-sweep '
+                    '(no se marca disponible=False sin datos frescos).'
+                ))
                 continue
 
             guardados, errores = self._guardar_productos(productos, fetcher)
             total_global += guardados
 
+            marcados = self._marcar_no_vistos(fuente, sync_started_at)
+            total_marcados += marcados
+
             self.stdout.write(self.style.SUCCESS(
-                f'\n  {fuente.nombre}: {guardados} guardados, {errores} errores.'
+                f'\n  {fuente.nombre}: {guardados} guardados, {errores} errores, '
+                f'{marcados} marcados como no disponibles (descontinuados).'
             ))
 
         self.stdout.write(self.style.SUCCESS(
-            f'\n  Total escrito en BD: {total_global} productos.'
+            f'\n  Total escrito en BD: {total_global} productos.\n'
+            f'  Total marcados como descontinuados: {total_marcados}.'
         ))
+
+    def _marcar_no_vistos(self, fuente, sync_started_at):
+        """
+        Mark-and-sweep: marca disponible=False los productos de esta fuente
+        que NO fueron tocados en este sync (synced_at < sync_started_at).
+
+        Productos que ya estaban disponible=False no se tocan (no hay nada que actualizar).
+        Solo se ejecuta si el sync trajo datos frescos (validado antes de llamar).
+        """
+        return ApiProductoCatalogo.objects.filter(
+            fuente=fuente,
+            synced_at__lt=sync_started_at,
+            disponible=True,
+        ).update(disponible=False)
 
     def _probar_conexion(self, fuentes):
         self.stdout.write('\n  Probando conexión a las fuentes activas...\n')
