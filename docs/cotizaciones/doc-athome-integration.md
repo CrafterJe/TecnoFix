@@ -1,8 +1,15 @@
-# Cotizaciones — Integración AtHome (parser local JSON)
+# Cotizaciones — Integración AtHome (dos parsers)
 
 ## Qué es
 
-AtHome (`athomemx.mx`) es una tercera fuente de productos incorporada al catálogo de APIs del módulo de cotizaciones. A diferencia de FixOEM y SupraTecMX (que usan la API pública de Shopify), AtHome provee su catálogo como archivos JSON estáticos locales, por lo que requirió un parser propio.
+AtHome (`athomemx.mx`) es una tercera fuente de productos del módulo de cotizaciones. A diferencia de FixOEM y SupraTecMX (que usan la API pública de Shopify), AtHome **no expone una API JSON**, así que se necesitan estrategias propias:
+
+| `tipo_parser` | Cómo obtiene los datos | Cuándo usarlo |
+|---|---|---|
+| `athome_v1` | Lee archivos JSON pre-generados (`catalogo_athome_parte*.json`) localmente | Dev local — rápido (segundos), no requiere internet |
+| `athome_web` | Scrapea el catálogo HTML en vivo extrayendo JSON-LD | Producción / Railway — funciona en cualquier ambiente con internet, ~3-5 min por sync |
+
+La selección de parser se hace por entorno: cada `FuenteApi` (registro de BD) tiene su propio `tipo_parser`, así que local puede usar `athome_v1` (rápido) y Railway puede usar `athome_web` (autónomo). El código y el resto del flujo (mark-and-sweep, BD, serializers) es idéntico para ambos.
 
 ---
 
@@ -159,10 +166,37 @@ Safety net: si `fetch_all()` falla o regresa vacío, el mark-and-sweep **se salt
 
 ## AtHome en producción (Railway)
 
-Actualmente AtHome **no se sincroniza automáticamente en Railway** porque el contenedor de producción no tiene los JSON locales (están en `.gitignore`). Las opciones futuras:
+Railway usa **`athome_web`** (scraping directo). El cron diario `sync_productos_api --all-active --no-interactive` scrapea el HTML de AtHome cada noche y actualiza el catálogo en la BD de producción.
 
-1. **Mantener manual**: solo se sincroniza cuando se corre el scraper localmente y se ejecuta el sync apuntando a la BD de producción. Útil mientras el catálogo de AtHome cambie poco.
-2. **Scraping directo en Railway** (estrategia elegida para el futuro): agregar `beautifulsoup4` a `requirements/production.txt` y modificar `AtHomeV1Fetcher` para hacer scraping en vivo (similar a `script.py` pero llamado desde el comando). Entonces AtHome entra automáticamente al cron `--all-active`.
+### Configurar AtHome en Railway por primera vez
+
+Ejecutar (vía shell de Railway sobre el servicio backend):
+
+```python
+python manage.py shell -c "from apps.cotizaciones.models import FuenteApi; FuenteApi.objects.filter(slug='athome').update(tipo_parser='athome_web', base_url='https://www.athomemx.mx/productos', activo=True)"
+```
+
+Esto cambia:
+- `tipo_parser`: `athome_v1` → `athome_web`
+- `base_url`: ruta local → URL del catálogo
+- `activo`: asegura que entre al `--all-active`
+
+### Parámetros del scraper
+
+| Constante | Valor | Por qué |
+|---|---|---|
+| `WORKERS` | 3 | Más conservador que el script standalone (5) para no estresar el servidor de AtHome |
+| `DELAY_BATCH` | 0.5s | Pausa entre lotes de 3 páginas |
+| `PRODUCTS_PER_PAGE` | 12 | Lo que devuelve AtHome por página |
+| `FALLBACK_MAX_PAGES` | 200 | Si no se detecta `productsCount` en el HTML, frena después de 200 páginas |
+
+### Cuánto tarda
+
+Con ~10,000 productos / 12 por página = ~833 páginas, en lotes de 3 con 0.5s de pausa = **~3-5 minutos** en Railway. El cron corre a las 4 AM CDMX (10:00 UTC), tráfico bajo en AtHome.
+
+### Safety net
+
+Si el scraping falla (timeout, AtHome devuelve HTML inválido, cambio de estructura), `fetch_all()` retorna lista vacía. El comando lo detecta y **se salta mark-and-sweep para esa fuente**: el catálogo no se marca como agotado, queda con los datos del día anterior. Hay que revisar logs.
 
 Ver `docs/admin/doc-railway-cron-sync.md` para la configuración del cron.
 

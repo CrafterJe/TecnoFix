@@ -18,11 +18,15 @@ Uso no interactivo (para cron / automatización):
     python manage.py sync_productos_api --fuente fixoem --no-interactive
 """
 import json
+import math
+import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import requests
+from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -202,10 +206,134 @@ class AtHomeV1Fetcher(BaseFetcher):
         )
 
 
+class AtHomeWebFetcher(AtHomeV1Fetcher):
+    """
+    Fetcher para AtHome: hace scraping en vivo del HTML extrayendo JSON-LD.
+
+    A diferencia de AtHomeV1Fetcher (que lee archivos JSON pre-generados),
+    este parser hace HTTP requests al catálogo HTML y parsea los datos en cada sync.
+    Pensado para entornos como Railway donde no hay archivos locales.
+
+    Reutiliza parse() de AtHomeV1Fetcher porque produce el mismo formato de dict
+    {nombre, sku, precio, stock, disponible, url}.
+    """
+    tipo_parser = 'athome_web'
+
+    PRODUCTS_PER_PAGE = 12
+    WORKERS = 3
+    DELAY_BATCH = 0.5
+    SCRAPE_USER_AGENT = (
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+        '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    )
+    FALLBACK_MAX_PAGES = 200
+
+    def _get_session(self):
+        session = requests.Session()
+        session.headers.update({'User-Agent': self.SCRAPE_USER_AGENT})
+        return session
+
+    def _extract_products_from_page(self, session, page):
+        url = f'{self.fuente.base_url.rstrip("/")}?page={page}'
+        try:
+            resp = session.get(url, timeout=15)
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            self.stdout.write(self.style.ERROR(f'  [ERR] Página {page}: {exc}'))
+            return []
+
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        products = []
+        for script in soup.find_all('script', type='application/ld+json'):
+            try:
+                data = json.loads(script.string or '')
+            except (json.JSONDecodeError, AttributeError):
+                continue
+            if data.get('@type') != 'Product':
+                continue
+
+            offers = data.get('offers') or {}
+            disponible = (offers.get('availability') or '').endswith('InStock')
+            inventory = offers.get('inventoryLevel') or {}
+            stock_raw = inventory.get('value', '0') if isinstance(inventory, dict) else '0'
+
+            products.append({
+                'nombre': data.get('name'),
+                'sku': data.get('sku'),
+                'precio': float(offers.get('price') or 0),
+                'stock': int(stock_raw) if str(stock_raw).isdigit() else 0,
+                'disponible': disponible,
+                'url': offers.get('url') or (data.get('mainEntityOfPage') or {}).get('@id'),
+            })
+        return products
+
+    def _get_total_pages(self, session):
+        try:
+            resp = session.get(self.fuente.base_url, timeout=15)
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            self.stdout.write(self.style.ERROR(f'  Error obteniendo página inicial: {exc}'))
+            return self.FALLBACK_MAX_PAGES
+
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        for script in soup.find_all('script'):
+            text = script.string or ''
+            match = re.search(r'productsCount\s*[:=]\s*(\d+)', text)
+            if match:
+                count = int(match.group(1))
+                pages = math.ceil(count / self.PRODUCTS_PER_PAGE)
+                self.stdout.write(f'  Total productos detectados: {count} -> {pages} páginas')
+                return pages
+        self.stdout.write(self.style.WARNING(
+            f'  No se pudo detectar productsCount, usando fallback {self.FALLBACK_MAX_PAGES} páginas'
+        ))
+        return self.FALLBACK_MAX_PAGES
+
+    def fetch_first_page(self):
+        session = self._get_session()
+        return self._extract_products_from_page(session, page=1)
+
+    def fetch_all(self):
+        session = self._get_session()
+        total_pages = self._get_total_pages(session)
+
+        all_products = []
+        found_end = False
+        with ThreadPoolExecutor(max_workers=self.WORKERS) as executor:
+            for batch_start in range(1, total_pages + 1, self.WORKERS):
+                if found_end:
+                    break
+                batch = range(batch_start, min(batch_start + self.WORKERS, total_pages + 1))
+                futures = {executor.submit(self._extract_products_from_page, session, p): p for p in batch}
+
+                page_results = {}
+                for future in as_completed(futures):
+                    page = futures[future]
+                    products = future.result()
+                    if not products:
+                        found_end = True
+                        self.stdout.write(f'  Página {page}: sin productos -> fin del catálogo')
+                    else:
+                        page_results[page] = products
+                        self.stdout.write(
+                            f'  Página {page}: +{len(products)} productos (parcial)'
+                        )
+
+                for page in sorted(page_results.keys()):
+                    all_products.extend(page_results[page])
+
+                if not found_end:
+                    time.sleep(self.DELAY_BATCH)
+
+        self.stdout.write(f'  Total scrapeado: {len(all_products)} productos')
+        return all_products
+
+
 # Registry de parsers disponibles.
 PARSERS = {
     ShopifyV1Fetcher.tipo_parser: ShopifyV1Fetcher,
     AtHomeV1Fetcher.tipo_parser: AtHomeV1Fetcher,
+    AtHomeWebFetcher.tipo_parser: AtHomeWebFetcher,
 }
 
 

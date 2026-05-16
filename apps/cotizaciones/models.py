@@ -272,11 +272,12 @@ class FuenteApi(AuditableMixin, BaseModel):
     PARSER_CHOICES = [
         ('shopify_v1', 'Shopify v1 (products.json paginado)'),
         ('athome_v1', 'AtHome v1 (archivos JSON locales)'),
+        ('athome_web', 'AtHome web (scraping JSON-LD en vivo)'),
     ]
 
     slug = models.SlugField('Slug', max_length=50, unique=True, blank=True, help_text='Identificador interno único (ej: fixoem). Se auto-genera del nombre si va vacío.')
     nombre = models.CharField('Nombre', max_length=100, help_text='Nombre visible (ej: FixOEM).')
-    base_url = models.CharField('URL / ruta base', max_length=500, help_text='URL raíz (Shopify) o ruta al directorio de archivos JSON (AtHome). Ej: https://fixoem.com o C:\\datos\\athome')
+    base_url = models.CharField('URL / ruta base', max_length=500, help_text='URL raíz (Shopify), ruta al directorio de archivos JSON (athome_v1) o URL del catálogo HTML (athome_web). Ej: https://fixoem.com, data/athome, https://www.athomemx.mx/productos')
     tipo_parser = models.CharField(
         'Tipo de parser', max_length=20, choices=PARSER_CHOICES, default='shopify_v1',
         help_text='Estrategia para descargar/parsear productos.',
