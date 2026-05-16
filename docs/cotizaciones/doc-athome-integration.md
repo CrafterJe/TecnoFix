@@ -26,13 +26,13 @@ Inserta el registro `FuenteApi` de AtHome en la BD:
 ```
 slug       = "athome"
 nombre     = "AtHome"
-base_url   = <ruta absoluta al directorio AtHome calculada en tiempo de migración>
+base_url   = <ruta calculada en tiempo de migración — puede ser absoluta o relativa>
 tipo_parser = "athome_v1"
 activo     = True
 orden      = 3
 ```
 
-> Si los archivos se mueven de carpeta, actualizar `base_url` desde `/admin/cotizaciones/fuenteapi/`.
+> **Recomendación**: usar **ruta relativa** `data/athome` para que el setup sea portable entre dispositivos. El fetcher resuelve `base_url` relativa contra `BASE_DIR` del proyecto. Si los archivos están en otra carpeta, actualizar `base_url` desde `/admin/cotizaciones/fuenteapi/`.
 
 ---
 
@@ -43,7 +43,7 @@ Archivo: `apps/cotizaciones/management/commands/sync_productos_api.py`
 ### Estructura de los archivos fuente
 
 ```
-TecnoFix/AtHome/
+TecnoFix-BackEnd/data/athome/           ← carpeta gitignored, no se sube al repo
 ├── catalogo_athome_parte001.json
 ├── catalogo_athome_parte002.json
 ├── ...
@@ -51,6 +51,8 @@ TecnoFix/AtHome/
 ```
 
 20 archivos, ~500 productos cada uno. Total: ~10,000 productos.
+
+> Estos archivos **no están en el repo** (ver `.gitignore: data/`) porque pesan varios MB y son regenerables. Cada dispositivo donde quieras correr el sync de AtHome necesita generar los suyos (ver siguiente sección).
 
 ### Formato de cada producto
 
@@ -112,15 +114,57 @@ fields = [
 
 ---
 
-## Sincronización
+## Generar los JSON localmente (primera vez en un equipo)
+
+Los archivos `catalogo_athome_parte*.json` no están en el repo; hay que generarlos con el scraper standalone:
 
 ```bash
-python manage.py sync_productos_api
-# Opción: "Sincronizar TODAS las fuentes" → incluye AtHome automáticamente
-# Opción: "Sincronizar solo AtHome"
+# 1. Instalar dependencia del scraper (NO va a requirements/ del backend; es solo para generar los JSONs)
+pip install beautifulsoup4
+
+# 2. Crear carpeta destino y correr el scraper desde ahí
+mkdir -p data/athome
+cd data/athome
+python ../../docs/api-samples/athome/script.py
+# Tarda varios minutos (~200 páginas, 5 workers en paralelo)
+# Genera catalogo_athome_parte001.json ... parteXXX.json + catalogo_athome_estructura.json
+
+cd ../..
+
+# 3. (Solo primera vez) Apuntar base_url a esa carpeta — desde /admin/cotizaciones/fuenteapi/
+#    Editar la fuente "AtHome" → base_url = data/athome  (ruta relativa al proyecto)
 ```
 
-AtHome lee los 20 archivos JSON locales en lugar de hacer requests HTTP. El flujo de bulk_create con upsert es idéntico al de Shopify.
+## Sincronización a BD
+
+```bash
+# Modo interactivo (manual, local)
+python manage.py sync_productos_api
+# Opción: "Sincronizar TODAS las fuentes" → incluye AtHome
+# Opción: "Sincronizar solo AtHome"
+
+# Modo no interactivo (cron, scripting)
+python manage.py sync_productos_api --fuente athome --no-interactive
+```
+
+AtHome lee los archivos JSON locales en lugar de hacer requests HTTP. El flujo de `bulk_create` con upsert es idéntico al de Shopify.
+
+### Mark-and-sweep
+
+Después del upsert, los productos de cada fuente que **no fueron tocados** en este sync (su `synced_at` quedó anterior al inicio del sync) se marcan como `disponible=False`. Esto refleja descontinuaciones del catálogo de origen sin borrar registros (mantiene histórico).
+
+Safety net: si `fetch_all()` falla o regresa vacío, el mark-and-sweep **se salta** para esa fuente — un fallo temporal no marca todo el catálogo como agotado.
+
+---
+
+## AtHome en producción (Railway)
+
+Actualmente AtHome **no se sincroniza automáticamente en Railway** porque el contenedor de producción no tiene los JSON locales (están en `.gitignore`). Las opciones futuras:
+
+1. **Mantener manual**: solo se sincroniza cuando se corre el scraper localmente y se ejecuta el sync apuntando a la BD de producción. Útil mientras el catálogo de AtHome cambie poco.
+2. **Scraping directo en Railway** (estrategia elegida para el futuro): agregar `beautifulsoup4` a `requirements/production.txt` y modificar `AtHomeV1Fetcher` para hacer scraping en vivo (similar a `script.py` pero llamado desde el comando). Entonces AtHome entra automáticamente al cron `--all-active`.
+
+Ver `docs/admin/doc-railway-cron-sync.md` para la configuración del cron.
 
 ---
 
